@@ -5,11 +5,11 @@ import conversion
 
 import rpy2.rlike.container as rlc
 
-import sys, copy, os, itertools
+import sys, copy, os, itertools, math
 import time
 from time import struct_time, mktime
 
-from rpy2.rinterface import Sexp, SexpVector, StrSexpVector, IntSexpVector, BoolSexpVector, ComplexSexpVector, FloatSexpVector, R_NilValue, NA_Real, NA_Integer, NA_Character, NA_Logical, NULL
+from rpy2.rinterface import Sexp, SexpVector, ListSexpVector, StrSexpVector, IntSexpVector, BoolSexpVector, ComplexSexpVector, FloatSexpVector, R_NilValue, NA_Real, NA_Integer, NA_Character, NA_Logical, NULL
 
 globalenv_ri = rinterface.globalenv
 baseenv_ri = rinterface.baseenv
@@ -286,13 +286,13 @@ class Vector(RObjectMixin, SexpVector):
                 if len(x) < max_width:
                     res = x
                 else:
-                    res = "%s..." %x[ : (max_width - 3)]
+                    res = "%s..." % (x[ : (max_width - 3)])
             return res
 
         l = len(self)
         if l < 7:
             s = '[' + \
-                ', '.join((p_str(x, max_width = 52 / l) for x in self[ : 8])) +\
+                ', '.join((p_str(x, max_width = math.floor(52 / l)) for x in self[ : 8])) +\
                 ']'
         else:
             s = '[' + \
@@ -469,7 +469,7 @@ class FactorVector(IntVector):
         for x in self:
             yield levels[x-1]
 
-class ListVector(Vector):
+class ListVector(Vector, ListSexpVector):
     """ R list (vector of arbitray elements)
 
     ListVector(iteritemable) -> ListVector.

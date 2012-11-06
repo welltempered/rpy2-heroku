@@ -12,7 +12,7 @@
  * for the specific language governing rights and limitations under the
  * License.
  * 
- * Copyright (C) 2008-2011 Laurent Gautier
+ * Copyright (C) 2008-2012 Laurent Gautier
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -28,8 +28,19 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+/* 
+ * As usual with rpy2, we have a Python objects that exposes an R object.
+ * In this file the type is ExtPtrSexp and the R object is an
+ * "external pointer" object that points to a 
+ * Python object. This allows us to pass around a Python object within
+ * the R side of rpy2.
+ *
+ * 
+*/
+
+
 /* Finalizer for R external pointers that are arbitrary Python objects */
-static SEXP
+static void
 R_PyObject_decref(SEXP s)
 {
   PyObject* pyo = (PyObject*)R_ExternalPtrAddr(s);
@@ -37,7 +48,6 @@ R_PyObject_decref(SEXP s)
     Py_DECREF(pyo);
     R_ClearExternalPtr(s);
   }
-  return R_NilValue;
 }
 
 
@@ -74,8 +84,14 @@ ExtPtrSexp_init(PySexpObject *self, PyObject *args, PyObject *kwds)
     return -1;
   }
   
-  /*FIXME: twist here - MakeExternalPtr will "preserve" the tag
-   * but the tag is already preserved (when exposed as a Python object) */
+  if (rpy_has_status(RPY_R_BUSY)) {
+    PyErr_Format(PyExc_RuntimeError, "Concurrent access to R is not allowed.");
+    return -1;
+  }
+  embeddedR_setlock();
+
+  /*FIXME: twist here - MakeExternalPtr will "preserve" the tag */
+  /* but the tag is already preserved (when exposed as a Python object) */
   /* R_ReleaseObject(pytag->sObj->sexp); */
   SEXP rtag, rprotected, rres;
   if (pytag == Py_None) {
@@ -88,14 +104,21 @@ ExtPtrSexp_init(PySexpObject *self, PyObject *args, PyObject *kwds)
   } else {
     rprotected = RPY_SEXP((PySexpObject *)pyprotected);
   }
+  /* FIXME: is the INCREF needed ? */
   Py_INCREF(pyextptr);
   rres  = R_MakeExternalPtr(pyextptr, rtag, rprotected);
-  R_RegisterCFinalizer(rres, (R_CFinalizer_t)R_PyObject_decref);
-  RPY_SEXP(self) = rres;
+  PROTECT(rres);
+  R_RegisterCFinalizerEx(rres, (R_CFinalizer_t)R_PyObject_decref, TRUE);
+  UNPROTECT(1);
+  if (Rpy_ReplaceSexp((PySexpObject *)self, rres) == -1) {
+      embeddedR_freelock();
+      return -1;
+  }
 
 #ifdef RPY_VERBOSE
   printf("done.\n");
 #endif 
+  embeddedR_freelock();
   return 0;
 }
 
@@ -138,7 +161,7 @@ ExtPtrSexp_tag(PySexpObject *self)
   }
   embeddedR_setlock();
   SEXP rtag = R_ExternalPtrTag(self->sObj->sexp);
-  PySexpObject *res = newPySexpObject(rtag, 0);
+  PySexpObject *res = newPySexpObject(rtag);
   embeddedR_freelock();
   return res;
 }
@@ -156,7 +179,7 @@ ExtPtrSexp_protected(PySexpObject *self)
   }
   embeddedR_setlock();
   SEXP rtag = R_ExternalPtrProtected(self->sObj->sexp);
-  PySexpObject *res = newPySexpObject(rtag, 0);
+  PySexpObject *res = newPySexpObject(rtag);
   embeddedR_freelock();
   return res;
 }

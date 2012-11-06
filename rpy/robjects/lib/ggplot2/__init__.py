@@ -4,19 +4,16 @@ import rpy2.robjects.conversion as conversion
 import rpy2.rinterface as rinterface
 from rpy2.robjects.packages import importr
 import copy
-import warnings
+
+import rpy2.robjects.lib.ggplot2.theme as theme
 
 NULL = robjects.NULL
 
 #getmethod = robjects.baseenv.get("getMethod")
 
 rimport = robjects.baseenv.get('library')
-
 ggplot2 = importr('ggplot2')
 
-TARGET_VERSION = '0.9.2.1'
-if ggplot2.__version__ != TARGET_VERSION:
-   warnings.warn('This was designed againt ggplot2 version %s but you have %s' % (TARGET_VERSION, ggplot2.__version__))
 ggplot2_env = robjects.baseenv['as.environment']('package:ggplot2')
 
 StrVector = robjects.StrVector
@@ -27,9 +24,9 @@ def as_symbol(x):
 
 class GGPlot(robjects.RObject):
 
-    _constructor = ggplot2._env['ggplot']
-    _rprint = ggplot2._env['print.ggplot']
-    _add = ggplot2._env['%+%']
+    _constructor = ggplot2_env['ggplot']
+    _rprint = robjects.baseenv[':::']('ggplot2', 'print.ggplot')
+    _add = ggplot2_env['+.ggplot']
 
     @classmethod
     def new(cls, data):
@@ -41,9 +38,7 @@ class GGPlot(robjects.RObject):
 
     def __add__(self, obj):
         res = self._add(self, obj)
-        if res.rclass[0] != 'gg':
-           raise ValueError("Added object did not give a ggplot result (get class '%s')." % res.rclass[0])
-        return GGPlot(res)
+        return res
 
 ggplot = GGPlot.new
 
@@ -368,6 +363,9 @@ position_dodge = PositionDodge.new
 class PositionFill(Position):
    _constructor = ggplot2_env['position_fill']
 position_fill = PositionFill.new
+class PositionIdentify(Position):
+   _constructor = ggplot2_env['position_identity']
+position_identity = PositionIdentify.new
 class PositionJitter(Position):
    _constructor = ggplot2_env['position_jitter']
 position_jitter = PositionJitter.new
@@ -382,9 +380,11 @@ class ScaleAlpha(Scale):
    _constructor = ggplot2_env['scale_alpha']
 scale_alpha = ScaleAlpha.new
 class ScaleColour(Scale):
-   pass
+   _constructor = ggplot2_env['scale_colour']
+scale_colour = ScaleColour.new
 class ScaleDiscrete(Scale):
-   pass
+   _constructor = ggplot2_env['scale_discrete']
+scale_discrete = ScaleDiscrete.new
 class ScaleLinetype(Scale):
    _constructor = ggplot2_env['scale_linetype']
 scale_linetype = ScaleLinetype.new
@@ -402,9 +402,9 @@ class ScaleX(Scale):
 class ScaleY(Scale):
    pass
 
-# class Limits(Scale):
-#    _constructor = ggplot2_env['limits']
-# limits = Limits.new
+class Limits(Scale):
+   _constructor = ggplot2_env['limits']
+limits = Limits.new
 
 class XLim(Scale):
    _constructor = ggplot2_env['xlim']
@@ -439,12 +439,66 @@ scale_x_datetime = ScaleXDatetime.new
 class ScaleYDatetime(ScaleY):
    _constructor = ggplot2_env['scale_y_datetime']
 scale_y_datetime = ScaleYDatetime.new
+class ScaleXExp(ScaleX):
+   _constructor = ggplot2_env['scale_x_exp']
+scale_x_exp = ScaleXExp.new
+class ScaleYExp(ScaleY):
+   _constructor = ggplot2_env['scale_y_exp']
+scale_y_exp = ScaleYExp.new
+class ScaleXInverse(ScaleX):
+   _constructor = ggplot2_env['scale_x_inverse']
+scale_x_inverse = ScaleXInverse.new
+class ScaleYInverse(ScaleY):
+   _constructor = ggplot2_env['scale_y_inverse']
+scale_y_inverse = ScaleYInverse.new
+class ScaleXLog(ScaleX):
+   _constructor = ggplot2_env['scale_x_log']
+scale_x_log = ScaleXLog.new
+class ScaleYLog(ScaleY):
+   _constructor = ggplot2_env['scale_y_log']
+scale_y_log = ScaleYLog.new
 class ScaleXLog10(ScaleX):
    _constructor = ggplot2_env['scale_x_log10']
 scale_x_log10 = ScaleXLog10.new
 class ScaleYLog10(ScaleY):
    _constructor = ggplot2_env['scale_y_log10']
 scale_y_log10 = ScaleYLog10.new
+class ScaleXLog2(ScaleX):
+   _constructor = ggplot2_env['scale_x_log2']
+scale_x_log2 = ScaleXLog2.new
+class ScaleYLog2(ScaleY):
+   _constructor = ggplot2_env['scale_y_log2']
+scale_y_log2 = ScaleYLog2.new
+class ScaleXLogit(ScaleX):
+   _constructor = ggplot2_env['scale_x_logit']
+scale_x_logit = ScaleXLogit.new
+class ScaleYLogit(ScaleY):
+   _constructor = ggplot2_env['scale_y_logit']
+scale_y_logit = ScaleYLogit.new
+class ScaleXPow(ScaleX):
+   _constructor = ggplot2_env['scale_x_pow']
+scale_x_pow = ScaleXPow.new
+class ScaleYPow(ScaleY):
+   _constructor = ggplot2_env['scale_y_pow']
+scale_y_pow = ScaleYPow.new
+class ScaleXPow10(ScaleX):
+   _constructor = ggplot2_env['scale_x_pow10']
+scale_x_pow10 = ScaleXPow10.new
+class ScaleYPow10(ScaleY):
+   _constructor = ggplot2_env['scale_y_pow10']
+scale_y_pow10 = ScaleYPow10.new
+class ScaleXProb(ScaleX):
+   _constructor = ggplot2_env['scale_x_prob']
+scale_x_prob = ScaleXProb.new
+class ScaleYProb(ScaleY):
+   _constructor = ggplot2_env['scale_y_prob']
+scale_y_prob = ScaleYProb.new
+class ScaleXProbit(ScaleX):
+   _constructor = ggplot2_env['scale_x_probit']
+scale_x_probit = ScaleXProbit.new
+class ScaleYProbit(ScaleY):
+   _constructor = ggplot2_env['scale_y_probit']
+scale_y_probit = ScaleYProbit.new
 class ScaleXReverse(ScaleX):
    _constructor = ggplot2_env['scale_x_reverse']
 scale_x_reverse = ScaleXReverse.new
@@ -525,106 +579,21 @@ class ScaleShapeManual(ScaleShape):
 scale_shape_manual = ScaleShapeManual.new
 
 
-class Options(robjects.Vector):
-   def __init__(self, obj):
-      self.__sexp__ = obj.__sexp__
 
-   def __repr__(self):
-      s = '<instance of %s : %i>' %(type(self), id(self)) 
-      return s
-
-
-class Element(Options):
-   pass
-
-class ElementText(Element):
-    _constructor = ggplot2.element_text
-    @classmethod
-    def new(cls, family = "", face = "plain", colour = "black", size = 10,
-            hjust = 0.5, vjust = 0.5, angle = 0, lineheight = 1.1, 
-            color = NULL):
-       res = cls(cls._constructor(family = family, face = face, 
-                                  colour = colour, size = size,
-                                  hjust = hjust, vjust = vjust, 
-                                  angle = angle, lineheight = lineheight))
-       return res
-element_text = ElementText.new
-
-
-
-class Theme(Options):
-   pass
-
-class ThemeBlank(Theme):
-    _constructor = ggplot2.theme_blank
-    @classmethod
-    def new(cls):
-        res = cls(cls._constructor())
-        return res
-
-theme_blank = ThemeBlank.new
-
+# --- themes
+theme_blank = theme.Blank.new
+theme_grey = theme.Grey.new
+theme_rect = theme.Rect.new
+theme_segment = theme.Segment.new
+theme_text = theme.Text.new
+theme_bw = theme.BW.new
+theme_gray = theme.Gray.new
+theme_line = theme.Line.new
+# theme_render
 theme_get = ggplot2.theme_get
-
-class ThemeGrey(Theme):
-    _constructor = ggplot2.theme_grey
-    @classmethod
-    def new(cls, base_size = 12):
-       res = cls(cls._constructor(base_size = base_size))
-       return res
-
-theme_grey = ThemeGrey.new
-
-class ThemeRect(Theme):
-    _constructor = ggplot2.theme_rect
-    @classmethod
-    def new(cls, fill = robjects.NA_Logical, colour = "black", 
-            size = 0.5, linetype = 1):
-       res = cls(cls._constructor(fill = fill, colour = colour, 
-                                  size = size, linetype = linetype))
-       return res
-theme_rect = ThemeRect.new
-
-class ThemeSegment(Theme):
-    _constructor = ggplot2.theme_rect
-    @classmethod
-    def new(cls, colour = 'black', size = 0.5, linetype = 1):
-       res = cls(cls._constructor(colour = colour, size = size,
-                                  linetype = linetype))
-       return res
-theme_segment = ThemeSegment.new
-
-
-class ThemeBW(Theme):
-    _constructor = ggplot2.theme_bw
-    @classmethod
-    def new(cls, base_size = 12):
-       res = cls(cls._constructor(base_size = base_size))
-       return res
-
-theme_bw = ThemeBW.new
-
-class ThemeGray(Theme):
-    _constructor = ggplot2.theme_gray
-    @classmethod
-    def new(cls, base_size = 12):
-       res = cls(cls._constructor(base_size = base_size))
-       return res
-theme_gray = ThemeGray.new
-
-class ThemeLine(Theme):
-    _constructor = ggplot2.theme_line
-    @classmethod
-    def new(cls, colour = 'black', size = 0.5, linetype = 1):
-       res = cls(cls._constructor(colour = colour, size = size,
-                                  linetype = linetype))
-       return res
-theme_line = ThemeLine.new
-
-#theme_render
 theme_set = ggplot2.theme_set
-
 theme_update = ggplot2.theme_update  
+
 
 gplot = ggplot2.qplot
 
@@ -642,7 +611,7 @@ def ggplot2_conversion(robj):
     if rcls is NULL:
        rcls = (None, )
 
-    if 'gg' in rcls:
+    if 'ggplot' in rcls:
        pyobj = GGPlot(pyobj)
 
     return pyobj

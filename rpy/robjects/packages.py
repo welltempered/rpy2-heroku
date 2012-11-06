@@ -12,12 +12,18 @@ _as_env = rinterface.baseenv['as.environment']
 _package_has_namespace = rinterface.baseenv['packageHasNamespace']
 _system_file = rinterface.baseenv['system.file']
 _get_namespace = rinterface.baseenv['getNamespace']
+_get_namespace_version = rinterface.baseenv['getNamespaceVersion']
 _get_namespace_exports = rinterface.baseenv['getNamespaceExports']
 _find_package = rinterface.baseenv['.find.package']
 _packages = rinterface.baseenv['.packages']
 _libpaths = rinterface.baseenv['.libPaths']
 _loaded_namespaces = rinterface.baseenv['loadedNamespaces']
 _globalenv = rinterface.globalenv
+_new_env = rinterface.baseenv["new.env"]
+
+StrSexpVector = rinterface.StrSexpVector
+_data = rinterface.baseenv['::'](StrSexpVector(('utils', )),
+                                 StrSexpVector(('data', )))
 
 _reval = rinterface.baseenv['eval']
 
@@ -48,6 +54,68 @@ def get_packagepath(package):
     return res[0]
 
 
+class PackageData(object):
+    """ Datasets in an R package.
+    In R datasets can be distributed with a package.
+
+    Datasets can be:
+
+    - serialized R objects
+
+    - R code (that produces the dataset)
+
+    For a given R packages, datasets are stored separately from the rest
+    of the code and are evaluated/loaded lazily.
+
+    The lazy aspect has been conserved and the dataset are only loaded
+    or generated when called through the method 'fetch()'.
+    """
+    _packagename = None
+    _lib_loc = None
+    _datasets = None
+    def __init__(self, packagename, lib_loc = rinterface.NULL):
+        self._packagename = packagename
+        self._lib_loc
+
+    def _init_setlist(self):
+        _datasets = dict()
+        # 2D array of information about datatsets
+        tmp_m = _data(**{'package':StrSexpVector((self._packagename, )),
+                         'lib.loc': self._lib_loc})[2]
+        nrows, ncols = tmp_m.do_slot('dim')
+        c_i = 2
+        for r_i in range(nrows):
+            _datasets[tmp_m[r_i + c_i * nrows]] = None
+            # FIXME: check if instance methods are overriden
+        self._datasets = _datasets
+
+    def names(self):
+        """ Names of the datasets"""
+        if self._datasets is None:
+            self._init_setlist()
+        return self._datasets.keys()
+    
+    def fetch(self, name):
+        """ Fetch the dataset (loads it or evaluates the R associated
+        with it.
+
+        In R, datasets are loaded into the global environment by default
+        but this function returns an environment that contains the dataset(s).
+        """
+        #tmp_env = rinterface.SexpEnvironment()
+        if self._datasets is None:
+            self._init_setlist()
+
+        if name not in self._datasets:
+            raise ValueError('Data set "%s" cannot be found' % name)
+        env = _new_env()
+        _data(StrSexpVector((name, )),
+              **{'package': StrSexpVector((self._packagename, )),
+                 'lib.loc': self._lib_loc,
+                 'envir': env})
+        return Environment(env)
+
+
 class Package(ModuleType):
     """ Models an R package
     (and can do so from an arbitrary environment - with the caution
@@ -61,9 +129,11 @@ class Package(ModuleType):
     __fill_rpy2r__ = None
     __update_dict__ = None
     _exported_names = None
+    __version__ = None
 
     def __init__(self, env, name, translation = {}, 
-                 exported_names = None, on_conflict = 'fail'):
+                 exported_names = None, on_conflict = 'fail',
+                 version = None):
         """ Create a Python module-like object from an R environment,
         using the specified translation if defined. 
 
@@ -81,6 +151,7 @@ class Package(ModuleType):
         self._exported_names = exported_names
         self.__fill_rpy2r__(on_conflict = on_conflict)
         self._exported_names = self._exported_names.difference(mynames)
+        self.__version__ = version
                 
     def __update_dict__(self, on_conflict = 'fail'):
         """ Update the __dict__ according to what is in the R environment """
@@ -166,7 +237,8 @@ def importr(name,
             robject_translations = {}, 
             signature_translation = True,
             suppress_messages = True,
-            on_conflict = 'fail'):
+            on_conflict = 'fail',
+            data = True):
     """ Import an R package.
 
     Arguments:
@@ -183,6 +255,8 @@ def importr(name,
       (defaut: True)
 
       - on_conflict: 'fail' or 'warn' (default: 'fail')
+
+      - data: embed a PackageData objects (default: True)
 
     Return:
 
@@ -201,21 +275,26 @@ def importr(name,
     if _package_has_namespace(rname, 
                               _system_file(package = rname)):
         env = _get_namespace(rname)
+        version = _get_namespace_version(rname)[0]
         exported_names = set(_get_namespace_exports(rname))
     else:
         env = _as_env(rinterface.StrSexpVector(['package:'+name, ]))
         exported_names = None
-
+        version = None
     if signature_translation:
         pack = SignatureTranslatedPackage(env, name, 
                                           translation = robject_translations,
                                           exported_names = exported_names,
-                                          on_conflict = on_conflict)
+                                          on_conflict = on_conflict,
+                                          version = version)
     else:
         pack = Package(env, name, translation = robject_translations,
                        exported_names = exported_names,
-                       on_conflict = on_conflict)
-        
+                       on_conflict = on_conflict,
+                       version = version)
+    if data:
+        pack.data = PackageData(name, lib_loc = lib_loc)
+
     return pack
 
 

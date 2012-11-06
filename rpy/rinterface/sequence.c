@@ -12,7 +12,7 @@
  * for the specific language governing rights and limitations under the
  * License.
  * 
- * Copyright (C) 2008-2011 Laurent Gautier
+ * Copyright (C) 2008-2012 Laurent Gautier
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -198,18 +198,18 @@ VectorSexp_item(PySexpObject* object, Py_ssize_t i)
     case VECSXP:
     case EXPRSXP:
       sexp_item = VECTOR_ELT(*sexp, i_R);
-      res = (PyObject *)newPySexpObject(sexp_item, 1);
+      res = (PyObject *)newPySexpObject(sexp_item);
       break;
     case LISTSXP:
       tmp = nthcdr(*sexp, i_R);
       sexp_item = allocVector(LISTSXP, 1);
       SETCAR(sexp_item, CAR(tmp));
       SET_TAG(sexp_item, TAG(tmp));
-      res = (PyObject *)newPySexpObject(sexp_item, 1);
+      res = (PyObject *)newPySexpObject(sexp_item);
       break;      
     case LANGSXP:
       sexp_item = CAR(nthcdr(*sexp, i_R));
-      res = (PyObject *)newPySexpObject(sexp_item, 1);
+      res = (PyObject *)newPySexpObject(sexp_item);
       break;
     default:
       PyErr_Format(PyExc_ValueError, "Cannot handle type %d", 
@@ -359,7 +359,7 @@ VectorSexp_slice(PySexpObject* object, Py_ssize_t ilow, Py_ssize_t ihigh)
   embeddedR_freelock();
   if (res_sexp == NULL) {    return NULL;
   }
-  return (PyObject*)newPySexpObject(res_sexp, 1);
+  return (PyObject*)newPySexpObject(res_sexp);
 }
 
 
@@ -899,16 +899,14 @@ VectorSexp_init(PyObject *self, PyObject *args, PyObject *kwds)
 
   PyObject *object;
   int sexptype = -1;
-  PyObject *copy = Py_False;
-  static char *kwlist[] = {"sexpvector", "sexptype", "copy", NULL};
+  static char *kwlist[] = {"sexpvector", "sexptype", NULL};
 
 
   /* FIXME: handle the copy argument */
-  if (! PyArg_ParseTupleAndKeywords(args, kwds, "O|iO!", 
+  if (! PyArg_ParseTupleAndKeywords(args, kwds, "O|i", 
                                     kwlist,
                                     &object,
-                                    &sexptype,
-                                    &PyBool_Type, &copy)) {
+                                    &sexptype)) {
     return -1;
   }
 
@@ -922,10 +920,10 @@ VectorSexp_init(PyObject *self, PyObject *args, PyObject *kwds)
                           (PyObject*)&VectorSexp_Type)) {
     /* call parent's constructor */
       if (Sexp_init(self, args, NULL) == -1) {
-      /* PyErr_Format(PyExc_RuntimeError, "Error initializing instance."); */
-      embeddedR_freelock();
-      return -1;
-    }
+	/* PyErr_Format(PyExc_RuntimeError, "Error initializing instance."); */
+	embeddedR_freelock();
+	return -1;
+      }
   } else if (PySequence_Check(object)) {
     if ((sexptype < 0) || (sexptype > RPY_MAX_VALIDSEXTYPE) || 
         (! validSexpType[sexptype])) {
@@ -936,16 +934,23 @@ VectorSexp_init(PyObject *self, PyObject *args, PyObject *kwds)
     /* FIXME: implemement automagic type ?
      *(RPy has something)... or leave it to extensions ? 
      */
-
     SEXP sexp = newSEXP(object, sexptype);
+    PROTECT(sexp); /* sexp is not preserved*/
     if (sexp == NULL) {
       /* newSEXP returning NULL will also have raised an exception
        * (not-so-clear design :/ )
        */
+      UNPROTECT(1);
       embeddedR_freelock();
       return -1;
     }
-    RPY_SEXP((PySexpObject *)self) = sexp;
+    if (Rpy_ReplaceSexp((PySexpObject *)self, sexp) == -1) {
+      embeddedR_freelock();
+      UNPROTECT(1);
+      return -1;
+    }
+    UNPROTECT(1);
+
     #ifdef RPY_DEBUG_OBJECTINIT
     printf("  SEXP vector is %p.\n", RPY_SEXP((PySexpObject *)self));
     #endif
@@ -1015,6 +1020,8 @@ VectorSexp_init_private(PyObject *self, PyObject *args, PyObject *kwds,
       return -1;
     }
   } else {
+    /* The parameter is not already a PySexpObject. Create
+     the necessary PySexpObjects. */
     int is_sequence = PySequence_Check(object);
     if ( !is_sequence ) {
       Py_ssize_t length = PyObject_Length(object);
@@ -1048,14 +1055,16 @@ VectorSexp_init_private(PyObject *self, PyObject *args, PyObject *kwds,
 	return -1;
       }
       
-      R_PreserveObject(sexp);
+      //R_PreserveObject(sexp);
 #ifdef RPY_DEBUG_PRESERVE
       preserved_robjects += 1;
       printf("  PRESERVE -- R_PreserveObject -- %p -- %i\n", 
 	     sexp, preserved_robjects);
 #endif  
-      
-      RPY_SEXP((PySexpObject *)self) = sexp;
+      if (Rpy_ReplaceSexp((PySexpObject *)self, sexp) == -1) {
+	embeddedR_freelock();
+	return -1;
+      }
 #ifdef RPY_DEBUG_OBJECTINIT
       printf("  SEXP vector is %p.\n", RPY_SEXP((PySexpObject *)self));
 #endif
@@ -1308,7 +1317,6 @@ IntVectorSexp_init(PyObject *self, PyObject *args, PyObject *kwds)
 				(RPy_seqobjtosexpproc)RPy_SeqToINTSXP,
 				(RPy_iterobjtosexpproc)RPy_IterToINTSXP,
 				INTSXP);
-
 #ifdef RPY_VERBOSE
   printf("done (IntVectorSexp_init).\n");
 #endif 

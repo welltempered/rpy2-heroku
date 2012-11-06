@@ -3,7 +3,7 @@ import itertools
 import pickle
 import rpy2
 import rpy2.rinterface as rinterface
-import sys, os, subprocess, time, tempfile, signal
+import sys, os, subprocess, time, tempfile, signal, gc
 
 IS_PYTHON3 = sys.version_info[0] == 3
 
@@ -181,6 +181,14 @@ except Exception%s e:
         ret_code = child_proc.poll()
         self.assertFalse(ret_code is None) # Interruption failed
 
+    def testRpyMemory(self):
+        x = rinterface.SexpVector(xrange(10), rinterface.INTSXP)
+        y = rinterface.SexpVector(xrange(10), rinterface.INTSXP)
+        x_rid = x.rid
+        self.assertTrue(x_rid in set(z[0] for z in rinterface.protected_rids()))
+        del(x)
+        gc.collect(); gc.collect()
+        self.assertFalse(x_rid in set(z[0] for z in rinterface.protected_rids()))
 
 class CallbacksTestCase(unittest.TestCase):
     def tearDown(self):
