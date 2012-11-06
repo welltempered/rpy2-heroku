@@ -131,6 +131,7 @@ class build_ext(_build_ext):
             tmp = os.popen("R RHOME")
             self.r_home = tmp.readlines()
             tmp.close()
+            self.r_home = ['/app/vendor/R/lib64/R\n']
             if len(self.r_home) == 0:
                 raise SystemExit("Error: Tried to guess R's HOME but no R command in the PATH.")
 
